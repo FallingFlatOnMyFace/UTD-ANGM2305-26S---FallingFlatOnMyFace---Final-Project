@@ -33,187 +33,128 @@ MOUNTAIN=(150,150,150)
 SNOW=(240,240,240)
 
 class Terrain:
-
     @staticmethod
     def get_color(h):
-
-        if h<40: return DEEP_WATER
-        elif h<70: return SHALLOW_WATER
-        elif h<85: return BEACH
-        elif h<145: return GRASS
-        elif h<185: return FOREST
-        elif h<220: return HILLS
-        elif h<245: return MOUNTAIN
+        if h<40:return DEEP_WATER
+        if h<70:return SHALLOW_WATER
+        if h<85:return BEACH
+        if h<145:return GRASS
+        if h<185:return FOREST
+        if h<220:return HILLS
+        if h<245:return MOUNTAIN
         return SNOW
 
 class Button:
-
     def __init__(self,x,y,w,h,text,font):
         self.rect=pygame.Rect(x,y,w,h)
         self.text=text
         self.font=font
 
     def draw(self,screen):
-        color=BUTTON_COLOR
+        c=BUTTON_COLOR
         if self.rect.collidepoint(pygame.mouse.get_pos()):
-            color=BUTTON_HOVER
-        pygame.draw.rect(screen,color,self.rect)
-        screen.blit(self.font.render(self.text,True,WHITE),(self.rect.x+10,self.rect.y+10))
+            c=BUTTON_HOVER
+
+        pygame.draw.rect(screen,c,self.rect)
+
+        label=self.font.render(self.text,True,WHITE)
+        screen.blit(label,(self.rect.centerx-label.get_width()//2,
+                          self.rect.centery-label.get_height()//2))
 
     def is_clicked(self,event):
         return event.type==pygame.MOUSEBUTTONDOWN and event.button==1 and self.rect.collidepoint(event.pos)
 
 class InputBox:
-
     def __init__(self,x,y,w,h,text=""):
         self.rect=pygame.Rect(x,y,w,h)
         self.text=text
         self.active=False
-        self.first_click=True
+        self.first=True
 
     def handle_event(self,event):
-
         if event.type==pygame.MOUSEBUTTONDOWN:
             if self.rect.collidepoint(event.pos):
                 self.active=True
-                if self.first_click:
+                if self.first:
                     self.text=""
-                    self.first_click=False
+                    self.first=False
             else:
                 self.active=False
 
         if event.type==pygame.KEYDOWN and self.active:
-
             if event.key==pygame.K_BACKSPACE:
                 self.text=self.text[:-1]
-
-            elif event.key==pygame.K_RETURN:
-                self.active=False
-
             else:
-                # NOW supports decimals
                 if event.unicode.isdigit() or event.unicode==".":
                     if event.unicode=="." and "." in self.text:
                         return
                     self.text+=event.unicode
 
     def draw(self,screen,font):
-        color=(110,110,110) if self.active else (70,70,70)
-        border=(255,255,255) if self.active else (40,40,40)
-
-        pygame.draw.rect(screen,color,self.rect)
-        pygame.draw.rect(screen,border,self.rect,2)
-
+        c=(110,110,110) if self.active else (70,70,70)
+        pygame.draw.rect(screen,c,self.rect)
+        pygame.draw.rect(screen,WHITE,self.rect,2)
         screen.blit(font.render(self.text,True,WHITE),(self.rect.x+5,self.rect.y+7))
 
     def get_value(self,fallback):
         try:
-            v=float(self.text)   # IMPORTANT CHANGE
+            v=float(self.text)
             return v if v>0 else fallback
         except:
             return fallback
 
 class MapGenerator:
-
     def __init__(self,w,h):
         self.w=w
         self.h=h
         self.map=[]
 
-    def apply_noise(self):
-        for y in range(self.h):
-            for x in range(self.w):
-                self.map[y][x]+=random.randint(-25,25)
-
     def smooth(self,p):
-
         for _ in range(p):
             new=[]
             for y in range(self.h):
                 row=[]
                 for x in range(self.w):
-
-                    s=0
-                    c=0
-
+                    s=c=0
                     for dy in (-1,0,1):
                         for dx in (-1,0,1):
-
-                            nx=x+dx
-                            ny=y+dy
-
+                            nx,ny=x+dx,y+dy
                             if 0<=nx<self.w and 0<=ny<self.h:
                                 s+=self.map[ny][nx]
                                 c+=1
-
                     row.append(s//c)
-
                 new.append(row)
-
             self.map=new
 
     def generate_random(self):
-
         self.map=[[random.randint(0,120) for _ in range(self.w)] for _ in range(self.h)]
-
         self.smooth(3)
 
-        for _ in range(random.randint(4,7)):
-
+        for _ in range(random.randint(8,16)):
             cx=random.randint(0,self.w-1)
             cy=random.randint(0,self.h-1)
-            r=random.randint(min(self.w,self.h)//8,min(self.w,self.h)//4)
+            radius=random.randint(min(self.w,self.h)//10,min(self.w,self.h)//3)
+            height=random.randint(60,180)
 
             for y in range(self.h):
                 for x in range(self.w):
-
                     dx=x-cx
                     dy=y-cy
                     d=(dx*dx+dy*dy)**0.5
+                    if d<radius:
+                        self.map[y][x]+=int((1-d/radius)*height)
 
-                    if d<r:
-                        self.map[y][x]+=int((1-d/r)*180)
+        for _ in range(random.randint(6,14)):
+            x,y=random.randint(0,self.w-1),random.randint(0,self.h-1)
+            length=random.randint(60,160)
+            dx,dy=random.choice([(1,0),(-1,0),(0,1),(0,-1),(1,1),(-1,-1),(1,-1),(-1,1)])
 
-        for _ in range(random.randint(3,6)):
-
-            ox=random.randint(0,self.w)
-            oy=random.randint(0,self.h)
-            r=random.randint(min(self.w,self.h)//6,min(self.w,self.h)//3)
-
-            for y in range(self.h):
-                for x in range(self.w):
-
-                    dx=x-ox
-                    dy=y-oy
-                    d=(dx*dx+dy*dy)**0.5
-
-                    if d<r:
-                        self.map[y][x]-=int((1-d/r)*200)
-
-        for _ in range(random.randint(4,8)):
-
-            x=random.randint(0,self.w-1)
-            y=random.randint(0,self.h-1)
-
-            for _ in range(random.randint(40,120)):
-
+            for _ in range(length):
                 if 0<=x<self.w and 0<=y<self.h:
+                    self.map[y][x]-=random.randint(15,50)
+                x+=dx+random.randint(-1,1)
+                y+=dy+random.randint(-1,1)
 
-                    self.map[y][x]+=random.randint(60,120)
-
-                    for oy in (-1,0,1):
-                        for ox in (-1,0,1):
-
-                            nx=x+ox
-                            ny=y+oy
-
-                            if 0<=nx<self.w and 0<=ny<self.h:
-                                self.map[ny][nx]+=random.randint(10,40)
-
-                x+=random.randint(-1,1)
-                y+=random.randint(-1,1)
-
-        self.apply_noise()
         self.smooth(2)
 
         for y in range(self.h):
@@ -221,58 +162,60 @@ class MapGenerator:
                 self.map[y][x]=max(0,min(255,self.map[y][x]))
 
     def from_heightmap(self,path):
-
         img=pygame.image.load(path)
-        img=img.convert_alpha() if img.get_alpha() else img.convert()
+        img=img.convert()
         img=pygame.transform.scale(img,(self.w,self.h))
 
-        self.map=[]
-
-        for y in range(self.h):
-            self.map.append([
-                sum(img.get_at((x,y))[:3])//3
-                for x in range(self.w)
-            ])
-
-        self.smooth(2)
-
-    def draw(self,screen,tile,grid):
-
-        grid=int(max(0.2,round(grid)))  # DECIMAL SAFE GRID FIX
+        self.map=[[0]*self.w for _ in range(self.h)]
 
         for y in range(self.h):
             for x in range(self.w):
+                r,g,b=img.get_at((x,y))[:3]
+                self.map[y][x]=(r+g+b)//3
 
-                r=pygame.Rect(
-                    UI_WIDTH+x*tile,
-                    y*tile,
-                    tile,
-                    tile
-                )
+        minv=min(min(row) for row in self.map)
+        maxv=max(max(row) for row in self.map)
 
-                pygame.draw.rect(screen,Terrain.get_color(self.map[y][x]),r)
+        if maxv-minv!=0:
+            for y in range(self.h):
+                for x in range(self.w):
+                    self.map[y][x]=int((self.map[y][x]-minv)/(maxv-minv)*255)
 
-                if grid>0 and tile>1:
-                    pygame.draw.rect(screen,GRID_COLOR,r,grid)
+        self.smooth(2)
+
+    def draw(self,screen,tile_size,grid_size):
+        offset_x=UI_WIDTH
+
+        for y in range(self.h):
+            for x in range(self.w):
+                v=self.map[y][x]
+                color=Terrain.get_color(v)
+
+                px=offset_x+x*tile_size
+                py=y*tile_size
+
+                pygame.draw.rect(screen,color,(px,py,tile_size,tile_size))
+
+                if grid_size>0:
+                    pygame.draw.rect(screen,GRID_COLOR,(px,py,tile_size,tile_size),1)
 
 def get_maps():
-
-    base_dir=os.path.dirname(os.path.abspath(__file__))
-    folder=os.path.join(base_dir,IMAGE_FOLDER)
+    base=os.path.dirname(os.path.abspath(__file__))
+    folder=os.path.join(base,IMAGE_FOLDER)
 
     if not os.path.exists(folder):
         os.makedirs(folder)
 
+    valid_ext={".png",".jpg",".jpeg"}
+
     return [
         os.path.join(folder,f)
         for f in os.listdir(folder)
-        if f.lower().endswith((".png",".jpg",".jpeg",".bmp"))
+        if os.path.splitext(f.lower())[1] in valid_ext
     ]
 
 def main():
-
     pygame.init()
-
     screen=pygame.display.set_mode((SCREEN_WIDTH,SCREEN_HEIGHT))
     clock=pygame.time.Clock()
 
@@ -294,17 +237,11 @@ def main():
     grid=DEFAULT_GRID_SIZE
 
     run=True
-
     while run:
-
         screen.fill(BLACK)
 
         for e in pygame.event.get():
-
             if e.type==pygame.QUIT:
-                run=False
-
-            if e.type==pygame.KEYDOWN and e.key==pygame.K_ESCAPE:
                 run=False
 
             w_in.handle_event(e)
@@ -313,31 +250,19 @@ def main():
             g_in.handle_event(e)
 
             if rand.is_clicked(e):
-
-                gen=MapGenerator(
-                    int(w_in.get_value(DEFAULT_MAP_WIDTH)),
-                    int(h_in.get_value(DEFAULT_MAP_HEIGHT))
-                )
-
+                gen=MapGenerator(int(w_in.get_value(DEFAULT_MAP_WIDTH)),
+                                 int(h_in.get_value(DEFAULT_MAP_HEIGHT)))
                 tile=max(2,int(t_in.get_value(DEFAULT_TILE_SIZE)))
                 grid=g_in.get_value(DEFAULT_GRID_SIZE)
-
                 gen.generate_random()
 
             if hm.is_clicked(e):
-
                 files=get_maps()
-
                 if files:
-
-                    gen=MapGenerator(
-                        int(w_in.get_value(DEFAULT_MAP_WIDTH)),
-                        int(h_in.get_value(DEFAULT_MAP_HEIGHT))
-                    )
-
+                    gen=MapGenerator(int(w_in.get_value(DEFAULT_MAP_WIDTH)),
+                                     int(h_in.get_value(DEFAULT_MAP_HEIGHT)))
                     tile=max(2,int(t_in.get_value(DEFAULT_TILE_SIZE)))
                     grid=g_in.get_value(DEFAULT_GRID_SIZE)
-
                     gen.from_heightmap(random.choice(files))
 
         gen.draw(screen,tile,grid)
@@ -345,11 +270,6 @@ def main():
         pygame.draw.rect(screen,UI_BG,(0,0,UI_WIDTH,SCREEN_HEIGHT))
 
         screen.blit(font.render("MAP GENERATOR",True,WHITE),(20,20))
-
-        screen.blit(small.render("Width",True,WHITE),(20,50))
-        screen.blit(small.render("Height",True,WHITE),(160,50))
-        screen.blit(small.render("Tile",True,WHITE),(20,120))
-        screen.blit(small.render("Grid",True,WHITE),(160,120))
 
         w_in.draw(screen,font)
         h_in.draw(screen,font)
@@ -361,9 +281,10 @@ def main():
 
         info=[
             "WARNING:",
-            "Tile size under 2 will break rendering.",
+            "Tile size under 2 will break rendering",
+            "If grid size is over .5.",
             "",
-            "Any grid value at or below 5 will remove grids.",
+            "Any grid value at or below .5 will remove grids.",
             "Width/Height = Map size.",
             "Tile = Zoom level.",
             "Grid = Border thickness of pixels.",
@@ -372,9 +293,8 @@ def main():
         ]
 
         y=420
-
-        for i in info:
-            screen.blit(small.render(i,True,WHITE),(20,y))
+        for line in info:
+            screen.blit(small.render(line,True,WHITE),(20,y))
             y+=18
 
         pygame.display.flip()
