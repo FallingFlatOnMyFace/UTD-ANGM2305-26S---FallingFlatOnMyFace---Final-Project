@@ -55,11 +55,12 @@ class Button:
         if self.rect.collidepoint(pygame.mouse.get_pos()):
             c=BUTTON_HOVER
 
-        pygame.draw.rect(screen,c,self.rect)
+        pygame.draw.rect(screen,c,self.rect,border_radius=4)
 
         label=self.font.render(self.text,True,WHITE)
-        screen.blit(label,(self.rect.centerx-label.get_width()//2,
-                          self.rect.centery-label.get_height()//2))
+        label_rect=label.get_rect(center=self.rect.center)
+
+        screen.blit(label,label_rect)
 
     def is_clicked(self,event):
         return event.type==pygame.MOUSEBUTTONDOWN and event.button==1 and self.rect.collidepoint(event.pos)
@@ -75,6 +76,7 @@ class InputBox:
         if event.type==pygame.MOUSEBUTTONDOWN:
             if self.rect.collidepoint(event.pos):
                 self.active=True
+
                 if self.first:
                     self.text=""
                     self.first=False
@@ -88,12 +90,15 @@ class InputBox:
                 if event.unicode.isdigit() or event.unicode==".":
                     if event.unicode=="." and "." in self.text:
                         return
+
                     self.text+=event.unicode
 
     def draw(self,screen,font):
         c=(110,110,110) if self.active else (70,70,70)
+
         pygame.draw.rect(screen,c,self.rect)
         pygame.draw.rect(screen,WHITE,self.rect,2)
+
         screen.blit(font.render(self.text,True,WHITE),(self.rect.x+5,self.rect.y+7))
 
     def get_value(self,fallback):
@@ -115,10 +120,13 @@ class MapGenerator:
             for y in range(self.h):
                 row=[]
                 for x in range(self.w):
-                    s=c=0
+                    s=0
+                    c=0
                     for dy in (-1,0,1):
                         for dx in (-1,0,1):
-                            nx,ny=x+dx,y+dy
+                            nx=x+dx
+                            ny=y+dy
+
                             if 0<=nx<self.w and 0<=ny<self.h:
                                 s+=self.map[ny][nx]
                                 c+=1
@@ -128,11 +136,13 @@ class MapGenerator:
 
     def generate_random(self):
         self.map=[[random.randint(0,120) for _ in range(self.w)] for _ in range(self.h)]
+
         self.smooth(3)
 
         for _ in range(random.randint(8,16)):
             cx=random.randint(0,self.w-1)
             cy=random.randint(0,self.h-1)
+
             radius=random.randint(min(self.w,self.h)//10,min(self.w,self.h)//3)
             height=random.randint(60,180)
 
@@ -140,18 +150,29 @@ class MapGenerator:
                 for x in range(self.w):
                     dx=x-cx
                     dy=y-cy
+
                     d=(dx*dx+dy*dy)**0.5
+
                     if d<radius:
                         self.map[y][x]+=int((1-d/radius)*height)
 
         for _ in range(random.randint(6,14)):
-            x,y=random.randint(0,self.w-1),random.randint(0,self.h-1)
+            x=random.randint(0,self.w-1)
+            y=random.randint(0,self.h-1)
+
             length=random.randint(60,160)
-            dx,dy=random.choice([(1,0),(-1,0),(0,1),(0,-1),(1,1),(-1,-1),(1,-1),(-1,1)])
+
+            dx,dy=random.choice([
+                (1,0),(-1,0),
+                (0,1),(0,-1),
+                (1,1),(-1,-1),
+                (1,-1),(-1,1)
+            ])
 
             for _ in range(length):
                 if 0<=x<self.w and 0<=y<self.h:
                     self.map[y][x]-=random.randint(15,50)
+
                 x+=dx+random.randint(-1,1)
                 y+=dy+random.randint(-1,1)
 
@@ -186,6 +207,9 @@ class MapGenerator:
     def draw(self,screen,tile_size,grid_size):
         offset_x=UI_WIDTH
 
+        draw_grid=grid_size>0.5
+        grid_width=max(1,int(grid_size))
+
         for y in range(self.h):
             for x in range(self.w):
                 v=self.map[y][x]
@@ -196,8 +220,13 @@ class MapGenerator:
 
                 pygame.draw.rect(screen,color,(px,py,tile_size,tile_size))
 
-                if grid_size>0:
-                    pygame.draw.rect(screen,GRID_COLOR,(px,py,tile_size,tile_size),1)
+                if draw_grid:
+                    pygame.draw.rect(
+                        screen,
+                        GRID_COLOR,
+                        (px,py,tile_size,tile_size),
+                        grid_width
+                    )
 
 def get_maps():
     base=os.path.dirname(os.path.abspath(__file__))
@@ -216,7 +245,10 @@ def get_maps():
 
 def main():
     pygame.init()
+
     screen=pygame.display.set_mode((SCREEN_WIDTH,SCREEN_HEIGHT))
+    pygame.display.set_caption("Map Generator")
+
     clock=pygame.time.Clock()
 
     font=pygame.font.SysFont("arial",22)
@@ -224,6 +256,7 @@ def main():
 
     w_in=InputBox(20,70,100,40,str(DEFAULT_MAP_WIDTH))
     h_in=InputBox(140,70,100,40,str(DEFAULT_MAP_HEIGHT))
+
     t_in=InputBox(20,150,100,40,str(DEFAULT_TILE_SIZE))
     g_in=InputBox(140,150,100,40,str(DEFAULT_GRID_SIZE))
 
@@ -237,6 +270,7 @@ def main():
     grid=DEFAULT_GRID_SIZE
 
     run=True
+
     while run:
         screen.fill(BLACK)
 
@@ -250,19 +284,28 @@ def main():
             g_in.handle_event(e)
 
             if rand.is_clicked(e):
-                gen=MapGenerator(int(w_in.get_value(DEFAULT_MAP_WIDTH)),
-                                 int(h_in.get_value(DEFAULT_MAP_HEIGHT)))
+                gen=MapGenerator(
+                    int(w_in.get_value(DEFAULT_MAP_WIDTH)),
+                    int(h_in.get_value(DEFAULT_MAP_HEIGHT))
+                )
+
                 tile=max(2,int(t_in.get_value(DEFAULT_TILE_SIZE)))
-                grid=g_in.get_value(DEFAULT_GRID_SIZE)
+                grid=max(0,g_in.get_value(DEFAULT_GRID_SIZE))
+
                 gen.generate_random()
 
             if hm.is_clicked(e):
                 files=get_maps()
+
                 if files:
-                    gen=MapGenerator(int(w_in.get_value(DEFAULT_MAP_WIDTH)),
-                                     int(h_in.get_value(DEFAULT_MAP_HEIGHT)))
+                    gen=MapGenerator(
+                        int(w_in.get_value(DEFAULT_MAP_WIDTH)),
+                        int(h_in.get_value(DEFAULT_MAP_HEIGHT))
+                    )
+
                     tile=max(2,int(t_in.get_value(DEFAULT_TILE_SIZE)))
-                    grid=g_in.get_value(DEFAULT_GRID_SIZE)
+                    grid=max(0,g_in.get_value(DEFAULT_GRID_SIZE))
+
                     gen.from_heightmap(random.choice(files))
 
         gen.draw(screen,tile,grid)
@@ -271,8 +314,14 @@ def main():
 
         screen.blit(font.render("MAP GENERATOR",True,WHITE),(20,20))
 
+        screen.blit(small.render("Width",True,WHITE),(20,50))
+        screen.blit(small.render("Height",True,WHITE),(140,50))
+        screen.blit(small.render("Tile Size",True,WHITE),(20,130))
+        screen.blit(small.render("Grid Size",True,WHITE),(140,130))
+
         w_in.draw(screen,font)
         h_in.draw(screen,font)
+
         t_in.draw(screen,font)
         g_in.draw(screen,font)
 
@@ -282,17 +331,19 @@ def main():
         info=[
             "WARNING:",
             "Tile size under 2 will break rendering",
-            "If grid size is over .5.",
+            "if grid size is over .5.",
             "",
-            "Any grid value at or below .5 will remove grids.",
+            "Grid <= .5 removes grid lines.",
             "Width/Height = Map size.",
             "Tile = Zoom level.",
-            "Grid = Border thickness of pixels.",
+            "Grid = Border thickness.",
             "",
-            "Supports custom heightmaps (imagelibrary folder)"
+            "Supports custom heightmaps",
+            "(imagelibrary folder)"
         ]
 
         y=420
+
         for line in info:
             screen.blit(small.render(line,True,WHITE),(20,y))
             y+=18
